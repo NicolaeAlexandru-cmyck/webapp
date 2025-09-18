@@ -782,7 +782,7 @@
     <nav class="navbar" id="navbar">
         <div class="container">
             <div class="nav-container">
-                <a href="#" class="logo">Elegant Weddings</a>
+                <a href="#home" class="logo">Elegant Weddings</a>
                 <ul class="nav-menu" id="navMenu">
                     <li><a href="#home" class="nav-link active">Home</a></li>
                     <li><a href="#services" class="nav-link">Services</a></li>
@@ -921,11 +921,11 @@
                         <label for="budget">Estimated Budget</label>
                         <select id="budget" name="budget" class="form-control">
                             <option value="">Select Budget Range</option>
-                            <option value="under-10k">Under $10,000</option>
-                            <option value="10k-25k">$10,000 - $25,000</option>
-                            <option value="25k-50k">$25,000 - $50,000</option>
-                            <option value="50k-100k">$50,000 - $100,000</option>
-                            <option value="over-100k">Over $100,000</option>
+                            <option value="under-50k">Under 50,000 LEI</option>
+                            <option value="50k-125k">50,000 - 125,000 LEI</option>
+                            <option value="125k-250k">125,000 - 250,000 LEI</option>
+                            <option value="250k-500k">250,000 - 500,000 LEI</option>
+                            <option value="over-500k">Over 500,000 LEI</option>
                         </select>
                     </div>
                 </div>
@@ -1058,6 +1058,14 @@
                         // Close mobile menu if open
                         document.getElementById('navMenu').classList.remove('active');
                     });
+                });
+
+                // Handle logo click
+                const logo = document.querySelector('.logo');
+                logo.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.showSection('home');
+                    this.updateActiveNav(document.querySelector('.nav-link[href="#home"]'));
                 });
 
                 // Handle CTA buttons
@@ -1249,10 +1257,19 @@
                         appointmentData[key] = value;
                     });
 
+                    // Handle multiple select for services
+                    const servicesSelect = form.querySelector('#services');
+                    if (servicesSelect) {
+                        const selectedServices = Array.from(servicesSelect.selectedOptions).map(option => option.value);
+                        appointmentData.services = selectedServices;
+                    }
+
                     // Add timestamp
                     appointmentData.submittedAt = new Date().toISOString();
 
-                    // Send to PHP API
+                    console.log('Submitting appointment data:', appointmentData);
+
+                    // Submit to your PHP backend
                     const response = await fetch('api/appointments.php', {
                         method: 'POST',
                         headers: {
@@ -1261,9 +1278,13 @@
                         body: JSON.stringify(appointmentData)
                     });
 
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
                     const result = await response.json();
 
-                    if (response.ok && result.success) {
+                    if (result.success) {
                         // Show success message
                         document.getElementById('successMessage').classList.add('show');
                         form.reset();
@@ -1278,7 +1299,19 @@
 
                 } catch (error) {
                     console.error('Error submitting appointment:', error);
-                    alert('There was an error submitting your appointment. Please try again or contact us directly.');
+                    
+                    // More detailed error message
+                    let errorMessage = 'There was an error submitting your appointment. ';
+                    
+                    if (error.message.includes('fetch')) {
+                        errorMessage += 'Please check that your PHP API is running and accessible.';
+                    } else if (error.message.includes('HTTP error')) {
+                        errorMessage += `Server returned error: ${error.message}`;
+                    } else {
+                        errorMessage += 'Please try again or contact us directly.';
+                    }
+                    
+                    alert(errorMessage);
                 } finally {
                     // Restore button
                     submitBtn.innerHTML = originalText;
@@ -1606,5 +1639,5 @@
             window.weddingSite = new WeddingPlannerSite();
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9810cd62540ee4ab',t:'MTc1ODE5ODA3OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9810f8c2a454e409',t:'MTc1ODE5OTg1NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
