@@ -16,8 +16,34 @@
     <meta property="og:image" content="">
     
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" onerror="this.remove()">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" onerror="this.remove()">
+    
+    <!-- Fallback CSS for icons if Font Awesome fails to load -->
+    <style>
+        .fa, .fas, .fab {
+            font-family: Arial, sans-serif;
+            font-style: normal;
+            font-weight: normal;
+        }
+        .fa-heart::before { content: '♥'; }
+        .fa-calendar-alt::before { content: '📅'; }
+        .fa-calendar-check::before { content: '✓'; }
+        .fa-clock::before { content: '🕐'; }
+        .fa-map-marker-alt::before { content: '📍'; }
+        .fa-palette::before { content: '🎨'; }
+        .fa-handshake::before { content: '🤝'; }
+        .fa-paper-plane::before { content: '✈'; }
+        .fa-search-plus::before { content: '🔍'; }
+        .fa-times::before { content: '✕'; }
+        .fa-bars::before { content: '☰'; }
+        .fa-phone::before { content: '📞'; }
+        .fa-envelope::before { content: '✉'; }
+        .fa-facebook-f::before { content: 'f'; }
+        .fa-instagram::before { content: 'ig'; }
+        .fa-pinterest::before { content: 'p'; }
+        .fa-twitter::before { content: 't'; }
+    </style>
     
     <style>
         :root {
@@ -1243,6 +1269,11 @@
             async submitAppointment(form) {
                 const submitBtn = form.querySelector('button[type="submit"]');
                 const originalText = submitBtn.innerHTML;
+                const successMessage = document.getElementById('successMessage');
+                
+                // Clear any previous messages
+                successMessage.classList.remove('show');
+                this.hideErrorMessage();
                 
                 // Show loading state
                 submitBtn.innerHTML = '<div class="loading"></div> Submitting...';
@@ -1251,15 +1282,17 @@
                 try {
                     const formData = new FormData(form);
                     
-                    // Convert FormData to JSON
+                    // Convert FormData to JSON with better handling
                     const appointmentData = {};
                     formData.forEach((value, key) => {
-                        appointmentData[key] = value;
+                        if (value && value.trim() !== '') {
+                            appointmentData[key] = value.trim();
+                        }
                     });
 
                     // Handle multiple select for services
                     const servicesSelect = form.querySelector('#services');
-                    if (servicesSelect) {
+                    if (servicesSelect && servicesSelect.selectedOptions.length > 0) {
                         const selectedServices = Array.from(servicesSelect.selectedOptions).map(option => option.value);
                         appointmentData.services = selectedServices;
                     }
@@ -1269,53 +1302,109 @@
 
                     console.log('Submitting appointment data:', appointmentData);
 
-                    // Submit to your PHP backend
+                    // Submit to your PHP backend with better error handling
                     const response = await fetch('api/appointments.php', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'Accept': 'application/json'
                         },
                         body: JSON.stringify(appointmentData)
                     });
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                    // Try to get response text for debugging
+                    const responseText = await response.text();
+                    console.log('Response status:', response.status);
+                    console.log('Response text:', responseText);
+
+                    // Parse response
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (e) {
+                        throw new Error('Invalid JSON response from server');
                     }
 
-                    const result = await response.json();
-
-                    if (result.success) {
+                    if (response.ok && result.success) {
                         // Show success message
-                        document.getElementById('successMessage').classList.add('show');
+                        successMessage.innerHTML = 'Thank you! Your appointment request has been submitted successfully. We\'ll contact you soon.';
+                        successMessage.classList.add('show');
                         form.reset();
                         
                         // Scroll to success message
-                        document.getElementById('successMessage').scrollIntoView({ 
+                        successMessage.scrollIntoView({ 
                             behavior: 'smooth' 
                         });
                     } else {
-                        throw new Error(result.message || 'Failed to submit appointment');
+                        // Handle specific error cases with user-friendly messages
+                        let userMessage = result.message || 'Failed to submit appointment';
+                        
+                        if (userMessage.includes('already submitted an appointment request within the last 24 hours')) {
+                            userMessage = 'You have already submitted an appointment request recently. We\'ll contact you soon! If you need to make changes or have urgent questions, please call us directly.';
+                        } else if (userMessage.includes('Invalid email')) {
+                            userMessage = 'Please enter a valid email address.';
+                        } else if (userMessage.includes('Missing required fields')) {
+                            userMessage = 'Please fill in all required fields (marked with *).';
+                        } else if (userMessage.includes('Database error')) {
+                            userMessage = 'We\'re experiencing technical difficulties. Please try again in a few minutes or contact us directly.';
+                        }
+                        
+                        this.showErrorMessage(userMessage);
                     }
 
                 } catch (error) {
                     console.error('Error submitting appointment:', error);
                     
-                    // More detailed error message
-                    let errorMessage = 'There was an error submitting your appointment. ';
+                    let userMessage = 'We\'re having trouble submitting your appointment request. ';
                     
-                    if (error.message.includes('fetch')) {
-                        errorMessage += 'Please check that your PHP API is running and accessible.';
-                    } else if (error.message.includes('HTTP error')) {
-                        errorMessage += `Server returned error: ${error.message}`;
+                    if (error.message.includes('Failed to fetch')) {
+                        userMessage += 'Please check your internet connection and try again.';
+                    } else if (error.message.includes('Invalid JSON')) {
+                        userMessage += 'There was a server communication error. Please try again.';
                     } else {
-                        errorMessage += 'Please try again or contact us directly.';
+                        userMessage += 'Please try again in a few minutes or contact us directly.';
                     }
                     
-                    alert(errorMessage);
+                    this.showErrorMessage(userMessage);
                 } finally {
                     // Restore button
                     submitBtn.innerHTML = originalText;
                     submitBtn.disabled = false;
+                }
+            }
+
+            showErrorMessage(message) {
+                // Create or update error message element
+                let errorDiv = document.getElementById('formErrorMessage');
+                if (!errorDiv) {
+                    errorDiv = document.createElement('div');
+                    errorDiv.id = 'formErrorMessage';
+                    errorDiv.className = 'error-message-box';
+                    errorDiv.style.cssText = `
+                        background: #f8d7da;
+                        color: #721c24;
+                        padding: 1rem;
+                        border-radius: 8px;
+                        margin-bottom: 1rem;
+                        border: 1px solid #f5c6cb;
+                        display: none;
+                    `;
+                    
+                    const form = document.getElementById('appointmentForm');
+                    form.insertBefore(errorDiv, form.firstChild);
+                }
+                
+                errorDiv.innerHTML = message;
+                errorDiv.style.display = 'block';
+                
+                // Scroll to error message
+                errorDiv.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            hideErrorMessage() {
+                const errorDiv = document.getElementById('formErrorMessage');
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
                 }
             }
 
@@ -1639,5 +1728,5 @@
             window.weddingSite = new WeddingPlannerSite();
         });
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9810f8c2a454e409',t:'MTc1ODE5OTg1NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98110abe4439e455',t:'MTc1ODIwMDU5MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
